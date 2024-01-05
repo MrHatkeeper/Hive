@@ -6,11 +6,6 @@ import random
 import os
 
 
-# Player template for HIVE --- ALP semestral work
-# Vojta Vonasek, 2023
-
-
-# PUT ALL YOUR IMPLEMENTATION INTO THIS FILE
 class Player(base.Board):
     def __init__(self, playerName, myIsUpper, size, myPieces, rivalPieces):  # do not change this line
         base.Board.__init__(self, myIsUpper, size, myPieces, rivalPieces)  # do not change this line
@@ -33,9 +28,21 @@ class Player(base.Board):
                     result.append([p, q])
         return result
 
-    def canFit(self, actPos: list[int], nePos: list[int]) -> bool:
-        # TODO do it lol
-        return True
+    def canFit(self, actPos: list[int], newPos: list[int]) -> bool:
+        actNeighbors = getAllNeighbor(actPos)
+        newPosNeighbors = getAllNeighbor(newPos)
+        neighborsUnion = []
+
+        for actNeighbor in actNeighbors:
+            if actNeighbor in newPosNeighbors:
+                neighborsUnion.append(actNeighbor)
+
+        occupiedNeighbors = 0
+        for neighbor in neighborsUnion:
+            if self.board[neighbor[0]][neighbor[1]] != "":
+                occupiedNeighbors += 1
+
+        return not occupiedNeighbors > len(neighborsUnion) // 2
 
     def isCellViable(self, pos: list[int]):
         if isInBoard(self.size, pos[0], pos[1]) and self.board[pos[0]][pos[1]] == "":
@@ -58,7 +65,7 @@ class Player(base.Board):
 
         for direction in directions:
             newPos = [pos[0] + direction[0], pos[1] + direction[1]]
-            if isInBoard(self.size, newPos[0], newPos[1]) and self.canFit(pos, newPos):
+            if isInBoard(self.size, newPos[0], newPos[1]):
                 moves.append(newPos)
         return moves
 
@@ -79,15 +86,15 @@ class Player(base.Board):
 
     def spiderMoves(self, position: list[int], prevMoves: list[list[int]], distance: int) -> list[list[int]]:
         # TODO
-        return [position, []]
+        return []
 
     def grasshopperMoves(self, position: list[int]) -> list[list[int]]:
         moves = []
         neighbors = list(filter(lambda x: isOccupied(x, self.board), getAllNeighbor(position)))
         for neighbor in neighbors:
-            move = self.grasshopperJump(position, neighbor)
-            if move is not []:
-                moves.append(move)
+            jump = self.grasshopperJump(position, neighbor)
+            if jump is not []:
+                moves.append(jump)
         return moves
 
     def grasshopperJump(self, prevPosition: list[int], position: list[int]) -> list[int]:
@@ -128,7 +135,11 @@ class Player(base.Board):
         return output
 
     def placePiece(self) -> list:
-        insect = random.choice(list(self.myPieces.keys()))
+        notEmptyPieces = []
+        for piece in self.myPieces:
+            if self.myPieces[piece] > 0:
+                notEmptyPieces.append(piece)
+        insect = random.choice(notEmptyPieces)
 
         emptyCells = self.getAllEmptyCells()
         usableCells = []
@@ -153,12 +164,17 @@ class Player(base.Board):
         """ return [animal, oldP, oldQ, newP, newQ], or [animal, None, None, newP, newQ] or [] """
         allFigures = getAllFigures(self.board)
         if len(allFigures[0] + allFigures[1]) == 0:
-            return ["s", None, None, 3, 6]
+            return ["q", None, None, 3, 6]
 
         if len(self.getAllEmptyCells()) == 0:
             return []
 
-        if len(self.myPieces) > 0:
+        notEmptyPieces = 0
+        for piece in self.myPieces:
+            if self.myPieces[piece] > 0:
+                notEmptyPieces += 1
+
+        if notEmptyPieces > 0:
             return self.placePiece()
 
         return self.movePiece()
@@ -208,7 +224,8 @@ def getAllNeighbor(bug: list[int]) -> list[list[int]]:
     for dq, dr in directions:
         neighbor_q = bug[0] + dq
         neighbor_r = bug[1] + dr
-        if isInBoard(boardSize, neighbor_q, neighbor_r): output.append([neighbor_q, neighbor_r])
+        if isInBoard(boardSize, neighbor_q, neighbor_r):
+            output.append([neighbor_q, neighbor_r])
     return output
 
 
@@ -270,10 +287,6 @@ if __name__ == "__main__":
     P1 = Player("player1", False, 13, smallFigures, bigFigures)
     P2 = Player("player2", True, 13, bigFigures, smallFigures)
 
-    P1.board[0][0] = "g"
-    P1.board[0][1] = "A"
-    P1.board[1][1] = "G"
-    P1.board[0][2] = "a"
     P2.board = copy.deepcopy(P1.board)
     filename = "moves/begin.png"
 
@@ -281,7 +294,7 @@ if __name__ == "__main__":
 
     moveIdx = 0
     while True:
-
+        print(moveIdx)
         move = P1.move()
         print("P1 returned", move)
         updatePlayers(move, P1, P2)  # update P1 and P2 according to the move
@@ -298,6 +311,6 @@ if __name__ == "__main__":
         P1.myMove = moveIdx
         P2.myMove = moveIdx
 
-        if moveIdx > 4:
+        if moveIdx > 50:
             print("End of the test game")
             break
