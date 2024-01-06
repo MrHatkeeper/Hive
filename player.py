@@ -1,9 +1,7 @@
 import copy
-import glob
 
 import base as base
 import random
-import os
 
 
 class Player(base.Board):
@@ -84,9 +82,24 @@ class Player(base.Board):
                     moves += self.antMoves(newPos, prevMoves)
         return moves
 
-    def spiderMoves(self, position: list[int], prevMoves: list[list[int]], distance: int) -> list[list[int]]:
-        # TODO
-        return []
+    def spiderMoves(self, position: list[int]) -> list[list[int]]:
+        output = []
+        firstStep = self.queenMoves(position)
+        visited = firstStep
+        visited.append(position)
+        stepHolder = firstStep
+        for moveIndex in range(2):
+            step = []
+            for i in stepHolder:
+                for j in self.queenMoves(i):
+                    if isOnePiece(self.board, position, j):
+                        step.append(j)
+            step = allNotVisited(step, visited)
+            visited += step
+            output = step
+        if len(output) == 0:
+            return []
+        return [output[0]]
 
     def grasshopperMoves(self, position: list[int]) -> list[list[int]]:
         moves = []
@@ -100,7 +113,7 @@ class Player(base.Board):
     def grasshopperJump(self, prevPosition: list[int], position: list[int]) -> list[int]:
         moveBy = [position[0] - prevPosition[0], position[1] - prevPosition[1]]
         nextPosition = [position[0] + moveBy[0], position[1] + moveBy[1]]
-        if not isInBoard(boardSize, nextPosition[0], nextPosition[1]):
+        if not isInBoard(13, nextPosition[0], nextPosition[1]):
             return []
         if isOccupied(nextPosition, self.board):
             return self.grasshopperJump(position, nextPosition)
@@ -113,17 +126,17 @@ class Player(base.Board):
         myFigures = getAllFigures(self.board)[player]
         possibleMoves = dict[tuple, list[list[int]]]()
         for figure in myFigures:
-            match self.board[figure[0]][figure[1]][-1].lower():
-                case "b":
-                    possibleMoves[tuple(figure)] = self.bugMoves(figure)
-                case "a":
-                    possibleMoves[tuple(figure)] = self.antMoves(figure, [])
-                case "g":
-                    possibleMoves[tuple(figure)] = self.grasshopperMoves(figure)
-                case "s":
-                    possibleMoves[tuple(figure)] = self.spiderMoves(figure, [], 0)
-                case "q":
-                    possibleMoves[tuple(figure)] = self.queenMoves(figure)
+            figureType = self.board[figure[0]][figure[1]][-1].lower()
+            if figureType == "b":
+                possibleMoves[tuple(figure)] = self.bugMoves(figure)
+            elif figureType == "a":
+                possibleMoves[tuple(figure)] = self.antMoves(figure, [])
+            elif figureType == "g":
+                possibleMoves[tuple(figure)] = self.grasshopperMoves(figure)
+            elif figureType == "s":
+                possibleMoves[tuple(figure)] = self.spiderMoves(figure)
+            elif figureType == "q":
+                possibleMoves[tuple(figure)] = self.queenMoves(figure)
         output = dict[tuple, list[list[int]]]()
         for possibleMove in possibleMoves.keys():
             for newPosition in possibleMoves[possibleMove]:
@@ -143,21 +156,29 @@ class Player(base.Board):
 
         emptyCells = self.getAllEmptyCells()
         usableCells = []
-
         for emptyCell in emptyCells:
             neighbors = list(filter(lambda x: isOccupied(x, self.board), getAllNeighbor(emptyCell)))
-            if (len(neighbors)) > 0:
+
+            if (len(neighbors)) > 0 and self.legalPlace(neighbors):
                 usableCells.append(emptyCell)
 
         coord = random.choice(usableCells)
 
         return [insect, None, None, coord[0], coord[1]]
 
+    def legalPlace(self, neighbors: list[list[int]]) -> bool:
+        for neighbor in neighbors:
+            if self.myColorIsUpper and self.board[neighbor[0]][neighbor[1]][-1].islower():
+                return False
+            elif not self.myColorIsUpper and self.board[neighbor[0]][neighbor[1]][-1].isupper():
+                return False
+        return True
+
     def movePiece(self):
         moves = self.getAllLegalMoves()
         prevPosition = random.choice(list(moves.keys()))
         newPosition = moves[prevPosition][random.randint(0, len(moves[prevPosition]) - 1)]
-        insect = self.board[prevPosition[0]][prevPosition[1]]
+        insect = self.board[prevPosition[0]][prevPosition[1]][-1]
         return [insect, prevPosition[0], prevPosition[1], newPosition[0], newPosition[1]]
 
     def move(self):
@@ -165,6 +186,8 @@ class Player(base.Board):
         allFigures = getAllFigures(self.board)
         if len(allFigures[0] + allFigures[1]) == 0:
             return ["q", None, None, 3, 6]
+        elif len(allFigures[0] + allFigures[1]) == 1:
+            return ["Q", None, None, 3, 5]
 
         if len(self.getAllEmptyCells()) == 0:
             return []
@@ -187,8 +210,43 @@ def moveFigure(board: dict[int, dict[int, str]], prevPos: list[int], newPos: lis
     return newBoard
 
 
+def allNotVisited(a: list[list[int]], visited: list[list[int]]) -> list[list[int]]:
+    output = []
+    for i in a:
+        if i not in visited:
+            output.append(i)
+    return output
+
+
 def isOnePiece(board: dict[int, dict[int, str]], prevPos: list[int], newPos: list[int]) -> bool:
     newBoard = moveFigure(board, prevPos, newPos)
+    holder = getAllFigures(newBoard)
+    cells = holder[0] + holder[1]
+
+    if len(cells) == 0:
+        return True
+
+    somethingChanged = True
+    frame = [cells[0]]
+    cells.pop(0)
+    while somethingChanged:
+        somethingChanged = False
+        for cell in cells:
+            neighbors = list(filter(lambda x: isOccupied(x, newBoard), getAllNeighbor(cell)))
+            for neighbor in neighbors:
+                if neighbor in frame:
+                    frame.append(cell)
+                    cells.remove(cell)
+                    somethingChanged = True
+                    break
+            if somethingChanged:
+                break
+    return sorted(holder[1] + holder[0]) == sorted(frame) and isOnePieceWithoutPiece(board, prevPos)
+
+
+def isOnePieceWithoutPiece(board: dict[int, dict[int, str]], prevPos: list[int]) -> bool:
+    newBoard = copy.deepcopy(board)
+    newBoard[prevPos[0]][prevPos[1]] = board[prevPos[0]][prevPos[1]][:-1]
     holder = getAllFigures(newBoard)
     cells = holder[0] + holder[1]
 
@@ -224,7 +282,7 @@ def getAllNeighbor(bug: list[int]) -> list[list[int]]:
     for dq, dr in directions:
         neighbor_q = bug[0] + dq
         neighbor_r = bug[1] + dr
-        if isInBoard(boardSize, neighbor_q, neighbor_r):
+        if isInBoard(13, neighbor_q, neighbor_r):
             output.append([neighbor_q, neighbor_r])
     return output
 
@@ -280,10 +338,6 @@ if __name__ == "__main__":
                     "g": 2}  # key is animal, value is how many is available for placing
     bigFigures = {figure.upper(): smallFigures[figure] for figure in smallFigures}  # same, but with upper case
 
-    files = glob.glob("moves/*")
-    for f in files:
-        os.remove(f)
-
     P1 = Player("player1", False, 13, smallFigures, bigFigures)
     P2 = Player("player2", True, 13, bigFigures, smallFigures)
 
@@ -294,7 +348,6 @@ if __name__ == "__main__":
 
     moveIdx = 0
     while True:
-        print(moveIdx)
         move = P1.move()
         print("P1 returned", move)
         updatePlayers(move, P1, P2)  # update P1 and P2 according to the move
