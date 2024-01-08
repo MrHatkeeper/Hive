@@ -9,6 +9,7 @@ class Player(base.Board):
         base.Board.__init__(self, myIsUpper, size, myPieces, rivalPieces)  # do not change this line
         self.playerName = playerName
         self.algorithmName = "💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩💩"
+        self.tournament = False
 
     def getAllEmptyCells(self):
         result = []
@@ -53,7 +54,8 @@ class Player(base.Board):
 
         for direction in directions:
             newPos = [pos[0] + direction[0], pos[1] + direction[1]]
-            if self.isCellViable(newPos) and self.canFit(pos, newPos):
+            if self.isCellViable(newPos) and self.canFit(pos, newPos) and self.hasCommonNeighbor(pos, newPos, pos,
+                                                                                                 False):
                 moves.append(newPos)
         return moves
 
@@ -82,24 +84,42 @@ class Player(base.Board):
                     moves += self.antMoves(newPos, prevMoves)
         return moves
 
+    def hasCommonNeighbor(self, actPos: list[int], newPos: list[int], spiderCheck: list[int], isSpider: bool) -> bool:
+        actNeighbors = getAllNeighbor(actPos)
+        newPosNeighbors = getAllNeighbor(newPos)
+        neighborsUnion = []
+
+        for actNeighbor in actNeighbors:
+            if actNeighbor in newPosNeighbors:
+                neighborsUnion.append(actNeighbor)
+
+        if isSpider and spiderCheck in neighborsUnion:
+            neighborsUnion.remove(spiderCheck)
+
+        occupiedNeighbors = 0
+        for neighbor in neighborsUnion:
+            if self.board[neighbor[0]][neighbor[1]] != "":
+                occupiedNeighbors += 1
+
+        return occupiedNeighbors > 0
+
     def spiderMoves(self, position: list[int]) -> list[list[int]]:
-        output = []
+        visited = []
         firstStep = self.queenMoves(position)
-        visited = firstStep
+        visited += firstStep
         visited.append(position)
         stepHolder = firstStep
         for moveIndex in range(2):
             step = []
             for i in stepHolder:
                 for j in self.queenMoves(i):
-                    if isOnePiece(self.board, position, j):
+                    if self.hasCommonNeighbor(i, j, position, True):
                         step.append(j)
             step = allNotVisited(step, visited)
             visited += step
-            output = step
-        if len(output) == 0:
-            return []
-        return [output[0]]
+            stepHolder = step
+
+        return stepHolder
 
     def grasshopperMoves(self, position: list[int]) -> list[list[int]]:
         moves = []
@@ -176,6 +196,8 @@ class Player(base.Board):
 
     def movePiece(self):
         moves = self.getAllLegalMoves()
+        if len(moves) == 0:
+            return []
         prevPosition = random.choice(list(moves.keys()))
         newPosition = moves[prevPosition][random.randint(0, len(moves[prevPosition]) - 1)]
         insect = self.board[prevPosition[0]][prevPosition[1]][-1]
@@ -184,10 +206,13 @@ class Player(base.Board):
     def move(self):
         """ return [animal, oldP, oldQ, newP, newQ], or [animal, None, None, newP, newQ] or [] """
         allFigures = getAllFigures(self.board)
-        if len(allFigures[0] + allFigures[1]) == 0:
+        if len(allFigures[0] + allFigures[1]) == 0 and self.myPieces["q"] != 0:
             return ["q", None, None, 3, 6]
         elif len(allFigures[0] + allFigures[1]) == 1:
-            return ["Q", None, None, 3, 5]
+            if self.myColorIsUpper and self.myPieces["Q"] != 0:
+                return ["Q", None, None, 3, 5]
+            elif not self.myColorIsUpper and self.myPieces["q"] != 0:
+                return ["q", None, None, 3, 5]
 
         if len(self.getAllEmptyCells()) == 0:
             return []
